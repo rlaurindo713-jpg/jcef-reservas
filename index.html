@@ -338,7 +338,7 @@
     renderList();
   }
 
-  const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxkyaFuTQdznm-4hzEfARLteQxu9Dd4d2fu4jVzpaFd-xJJsIDloCuIlBcIumtgcbDV/exec';
+  const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxSNoXI0yMH7nGPA9KEtbZBz3hyUG_U_iN938MGoIOQlvayIqsiTTV24Uvkdk2sU8Yt/exec';
 
   function submitReserva() {
     const colab = document.getElementById('f-colab').value.trim();
@@ -362,7 +362,6 @@
     fetch(SCRIPT_URL, {
       method: 'POST',
       mode: 'no-cors',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(reserva)
     })
     .then(() => showToast('✓ Solicitação enviada com sucesso!'))
