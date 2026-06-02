@@ -9,6 +9,8 @@
   <link rel="manifest" href="manifest.json" />
   <link rel="apple-touch-icon" href="icon.png" />
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css" />
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f1f3f4; min-height: 100vh; }
@@ -90,6 +92,10 @@
     .ri-name { font-size: 14px; color: #222; font-weight: 500; }
     .ri-date { font-size: 12px; color: #888; margin-top: 2px; }
 
+    .loading { text-align: center; padding: 40px; color: #999; font-size: 14px; }
+    .loading i { font-size: 32px; display: block; margin-bottom: 8px; animation: spin 1s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
     .toast { display: none; position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: #323232; color: #fff; padding: 12px 20px; border-radius: 8px; font-size: 14px; z-index: 999; white-space: nowrap; box-shadow: 0 4px 12px rgba(0,0,0,0.2); }
     .toast.show { display: block; }
   </style>
@@ -111,7 +117,7 @@
 <div id="screen-nova" class="screen active">
   <div class="info-banner">
     <i class="ti ti-info-circle" style="font-size:16px;flex-shrink:0;margin-top:1px;"></i>
-    <span>Hotel e cidade serão definidos pelo comprador após a aprovação.</span>
+    <span>Hotel será definido pelo comprador após a aprovação.</span>
   </div>
 
   <div class="section-label"><i class="ti ti-user"></i> Dados pessoais</div>
@@ -174,7 +180,7 @@
     <div class="chip" onclick="filterList(this,'aprovada')">Aprovadas</div>
     <div class="chip" onclick="filterList(this,'cancelada')">Canceladas</div>
   </div>
-  <div id="lista-container"></div>
+  <div id="lista-container"><div class="loading"><i class="ti ti-refresh"></i>Carregando...</div></div>
 </div>
 
 <!-- DASHBOARD -->
@@ -195,18 +201,36 @@
 <div class="toast" id="toast"></div>
 
 <script>
-  const STORAGE_KEY = 'jcf_reservas';
+  // Firebase config
+  const firebaseConfig = {
+    apiKey: "AIzaSyDrDc5iFa1DQa1pVjUzNMhyQR_zgGZMAxE",
+    authDomain: "jcef-reservas.firebaseapp.com",
+    databaseURL: "https://jcef-reservas-default-rtdb.firebaseio.com",
+    projectId: "jcef-reservas",
+    storageBucket: "jcef-reservas.firebasestorage.app",
+    messagingSenderId: "801608910641",
+    appId: "1:801608910641:web:1ee965dbae8c8e03c6d210"
+  };
 
-  function carregarReservas() {
-    try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || []; } catch { return []; }
-  }
-  function salvarReservas() {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(reservas));
-  }
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.database();
+  const reservasRef = db.ref('reservas');
 
-  let reservas = carregarReservas();
-  let nextId = reservas.length ? Math.max(...reservas.map(r=>r.id)) + 1 : 1;
+  const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbz1K5E6460O6TqAIIeZfAZfb0G6FTt6uQWp3E1_DAKKW8YpqiqOcTwTSPkq70Xn5rkZ/exec';
+  const DASH_SENHA = 'compras2026';
+  let dashLiberado = false;
+  let reservas = [];
   let curFilter = 'todas';
+
+  // Escuta mudanças no Firebase em tempo real
+  reservasRef.on('value', (snapshot) => {
+    const data = snapshot.val();
+    reservas = data ? Object.entries(data).map(([key, val]) => ({ ...val, firebaseKey: key })) : [];
+    reservas.sort((a, b) => (b.id || 0) - (a.id || 0));
+    const tela = document.querySelector('.tab.active');
+    if(tela && tela.textContent.includes('Reservas')) renderList();
+    if(tela && tela.textContent.includes('Dashboard')) renderDash();
+  });
 
   function mascaraCPF(el) {
     let v = el.value.replace(/\D/g,'').slice(0,11);
@@ -229,14 +253,11 @@
     setTimeout(() => t.classList.remove('show'), 2500);
   }
 
-  const DASH_SENHA = 'compras2026';
-  let dashLiberado = false;
-
   function switchTab(name) {
     if(name === 'dash' && !dashLiberado) {
-      const senha = prompt('🔒 Área restrita\nDigite a senha para acessar o Dashboard:');
+      const senha = prompt('Área restrita\nDigite a senha para acessar o Dashboard:');
       if(senha === null) return;
-      if(senha !== DASH_SENHA) { showToast('⚠ Senha incorreta!'); return; }
+      if(senha !== DASH_SENHA) { showToast('Senha incorreta!'); return; }
       dashLiberado = true;
     }
     document.querySelectorAll('.tab').forEach((t,i) => t.classList.toggle('active', ['nova','lista','dash'][i]===name));
@@ -275,73 +296,67 @@
         ${r.status==='aprovada' ? `
           <div class="r-hotel-field">
             <label>HOTEL (definido pelo comprador)</label>
-            <input type="text" placeholder="Nome do hotel / pousada" value="${r.hotel||''}" onchange="salvarHotel(${r.id}, this.value)" />
+            <input type="text" placeholder="Nome do hotel / pousada" value="${r.hotel||''}" onchange="salvarHotel('${r.firebaseKey}', this.value)" />
           </div>
           <div class="anexo-area">
-            <label><i class="ti ti-paperclip" style="font-size:12px;"></i> Comprovante da reserva</label>
+            <label><i class="ti ti-paperclip" style="font-size:12px;"></i> Voucher da reserva</label>
             ${r.anexo ? `
               <div class="anexo-preview">
                 <i class="ti ti-file-text" style="color:#1a73e8;font-size:18px;flex-shrink:0;"></i>
                 <span>${r.anexoNome}</span>
                 <a href="${r.anexo}" download="${r.anexoNome}">Baixar</a>
-                <span class="del-anexo" onclick="removerAnexo(${r.id})">×</span>
+                <span class="del-anexo" onclick="removerAnexo('${r.firebaseKey}')">×</span>
               </div>` : `
-              <label class="anexo-btn" for="anexo-${r.id}">
-                <i class="ti ti-upload"></i> Anexar comprovante (PDF ou imagem)
+              <label class="anexo-btn" for="anexo-${r.firebaseKey}">
+                <i class="ti ti-upload"></i> Anexar voucher (PDF ou imagem)
               </label>
-              <input type="file" id="anexo-${r.id}" accept=".pdf,image/*" style="display:none" onchange="salvarAnexo(${r.id}, this)" />`}
+              <input type="file" id="anexo-${r.firebaseKey}" accept=".pdf,image/*" style="display:none" onchange="salvarAnexo('${r.firebaseKey}', this)" />`}
           </div>` : ''}
         ${r.status==='pendente' ? `
           <div class="r-actions">
-            <div class="btn-sm approve" onclick="mudarStatus(${r.id},'aprovada')"><i class="ti ti-check"></i> Aprovar</div>
-            <div class="btn-sm cancel" onclick="mudarStatus(${r.id},'cancelada')"><i class="ti ti-x"></i> Cancelar</div>
+            <div class="btn-sm approve" onclick="mudarStatus('${r.firebaseKey}','aprovada')"><i class="ti ti-check"></i> Aprovar</div>
+            <div class="btn-sm cancel" onclick="mudarStatus('${r.firebaseKey}','cancelada')"><i class="ti ti-x"></i> Cancelar</div>
           </div>` : ''}
         <div style="margin-top:10px;text-align:right;">
-          <span onclick="excluirReserva(${r.id})" style="font-size:12px;color:#999;cursor:pointer;"><i class="ti ti-trash" style="font-size:13px;vertical-align:-1px;"></i> Excluir</span>
+          <span onclick="excluirReserva('${r.firebaseKey}')" style="font-size:12px;color:#999;cursor:pointer;"><i class="ti ti-trash" style="font-size:13px;vertical-align:-1px;"></i> Excluir</span>
         </div>
       </div>
     `).join('');
   }
 
-  function excluirReserva(id) {
-    const senha = prompt('🔒 Digite a senha do comprador para excluir:');
-    if(senha === null) return;
-    if(senha !== DASH_SENHA) { showToast('⚠ Senha incorreta!'); return; }
-    reservas = reservas.filter(x => x.id !== id);
-    salvarReservas();
-    renderList();
-    showToast('✓ Reserva excluída!');
+  function salvarHotel(key, val) {
+    reservasRef.child(key).update({ hotel: val });
+    showToast('Hotel salvo!');
   }
 
-  function salvarHotel(id, val) {
-    const r = reservas.find(x=>x.id===id);
-    if(r) { r.hotel = val; salvarReservas(); showToast('Hotel salvo!'); }
-  }
-
-  function salvarAnexo(id, input) {
-    const r = reservas.find(x=>x.id===id);
-    if(!r || !input.files[0]) return;
+  function salvarAnexo(key, input) {
+    if(!input.files[0]) return;
     const file = input.files[0];
-    if(file.size > 5 * 1024 * 1024) { showToast('⚠ Arquivo muito grande. Máximo 5MB.'); return; }
+    if(file.size > 5 * 1024 * 1024) { showToast('Arquivo muito grande. Máximo 5MB.'); return; }
     const reader = new FileReader();
     reader.onload = function(e) {
-      r.anexo = e.target.result;
-      r.anexoNome = file.name;
-      salvarReservas();
-      renderList();
-      showToast('✓ Comprovante anexado!');
+      reservasRef.child(key).update({ anexo: e.target.result, anexoNome: file.name });
+      showToast('Voucher anexado!');
     };
     reader.readAsDataURL(file);
   }
 
-  function removerAnexo(id) {
-    const r = reservas.find(x=>x.id===id);
-    if(r) { r.anexo = null; r.anexoNome = null; salvarReservas(); renderList(); showToast('Comprovante removido.'); }
+  function removerAnexo(key) {
+    reservasRef.child(key).update({ anexo: null, anexoNome: null });
+    showToast('Voucher removido.');
   }
 
-  function mudarStatus(id, novoStatus) {
-    const r = reservas.find(x=>x.id===id);
-    if(r) { r.status = novoStatus; salvarReservas(); renderList(); showToast('Status: '+novoStatus); }
+  function mudarStatus(key, novoStatus) {
+    reservasRef.child(key).update({ status: novoStatus });
+    showToast('Status: ' + novoStatus);
+  }
+
+  function excluirReserva(key) {
+    const senha = prompt('Digite a senha do comprador para excluir:');
+    if(senha === null) return;
+    if(senha !== DASH_SENHA) { showToast('Senha incorreta!'); return; }
+    reservasRef.child(key).remove();
+    showToast('Reserva excluída!');
   }
 
   function filterList(el, f) {
@@ -350,8 +365,6 @@
     curFilter = f;
     renderList();
   }
-
-  const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbz1K5E6460O6TqAIIeZfAZfb0G6FTt6uQWp3E1_DAKKW8YpqiqOcTwTSPkq70Xn5rkZ/exec';
 
   function submitReserva() {
     const colab = document.getElementById('f-colab').value.trim();
@@ -362,23 +375,19 @@
     const cin = document.getElementById('f-cin').value;
     const cout = document.getElementById('f-cout').value;
     const obs = document.getElementById('f-obs').value.trim();
-    if(!colab||!cpf||!nasc||!projeto||!cidade||!cin||!cout) { showToast('⚠ Preencha todos os campos obrigatórios'); return; }
-    if(cpf.replace(/\D/g,'').length < 11) { showToast('⚠ CPF inválido'); return; }
-    if(cin>=cout) { showToast('⚠ Check-out deve ser após o check-in'); return; }
+    if(!colab||!cpf||!nasc||!projeto||!cidade||!cin||!cout) { showToast('Preencha todos os campos obrigatórios'); return; }
+    if(cpf.replace(/\D/g,'').length < 11) { showToast('CPF inválido'); return; }
+    if(cin>=cout) { showToast('Check-out deve ser após o check-in'); return; }
 
-    const reserva = { id:nextId++, colab, cpf, nasc, projeto, cidade, cin, cout, obs, status:'pendente', hotel:'' };
-    reservas.unshift(reserva);
-    salvarReservas();
+    const id = Date.now();
+    const reserva = { id, colab, cpf, nasc, projeto, cidade, cin, cout, obs, status:'pendente', hotel:'', anexo: null, anexoNome: null };
+    
+    reservasRef.push(reserva);
     ['f-colab','f-cpf','f-nasc','f-projeto','f-cidade','f-cin','f-cout','f-obs'].forEach(id => { document.getElementById(id).value=''; });
-    showToast('⏳ Enviando solicitação...');
+    showToast('Solicitacao enviada!');
 
-    fetch(SCRIPT_URL, {
-      method: 'POST',
-      mode: 'no-cors',
-      body: JSON.stringify(reserva)
-    })
-    .then(() => showToast('✓ Solicitação enviada com sucesso!'))
-    .catch(() => showToast('✓ Salvo! Verifique a conexão.'));
+    fetch(SCRIPT_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify(reserva) })
+      .catch(() => {});
   }
 
   function renderDash() {
@@ -399,7 +408,7 @@
     const linhas = reservas.map(r=>[r.id,r.colab,r.cpf,formatDate(r.nasc),r.projeto,r.cidade,formatDate(r.cin),formatDate(r.cout),r.hotel||'',r.status,r.obs].join('\t')).join('\n');
     const blob = new Blob([cab+'\n'+linhas], {type:'text/tab-separated-values;charset=utf-8;'});
     const a = document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='Reservas_JCF.xls'; a.click();
-    showToast('✓ Arquivo exportado!');
+    showToast('Arquivo exportado!');
   }
 
   if('serviceWorker' in navigator) {
