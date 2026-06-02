@@ -1,8 +1,8 @@
 const CACHE = 'jcf-reservas-v1';
 const FILES = [
-  '/reservas-jcf/',
-  '/reservas-jcf/index.html',
-  '/reservas-jcf/manifest.json'
+  '/jcef-reservas/',
+  '/jcef-reservas/index.html',
+  '/jcef-reservas/manifest.json'
 ];
 
 self.addEventListener('install', e => {
