@@ -296,8 +296,21 @@
             <div class="btn-sm approve" onclick="mudarStatus(${r.id},'aprovada')"><i class="ti ti-check"></i> Aprovar</div>
             <div class="btn-sm cancel" onclick="mudarStatus(${r.id},'cancelada')"><i class="ti ti-x"></i> Cancelar</div>
           </div>` : ''}
+        <div style="margin-top:10px;text-align:right;">
+          <span onclick="excluirReserva(${r.id})" style="font-size:12px;color:#999;cursor:pointer;"><i class="ti ti-trash" style="font-size:13px;vertical-align:-1px;"></i> Excluir</span>
+        </div>
       </div>
     `).join('');
+  }
+
+  function excluirReserva(id) {
+    const senha = prompt('🔒 Digite a senha do comprador para excluir:');
+    if(senha === null) return;
+    if(senha !== DASH_SENHA) { showToast('⚠ Senha incorreta!'); return; }
+    reservas = reservas.filter(x => x.id !== id);
+    salvarReservas();
+    renderList();
+    showToast('✓ Reserva excluída!');
   }
 
   function salvarHotel(id, val) {
