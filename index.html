@@ -287,6 +287,8 @@
     renderList();
   }
 
+  const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzQPGC9VvtTiuNHa3FjEuhWoPAgjVh0ynhTF92JIj2Mqg9z4UiHFzmsszKBd-mblCbk/exec';
+
   function submitReserva() {
     const colab = document.getElementById('f-colab').value.trim();
     const cpf = document.getElementById('f-cpf').value.trim();
@@ -299,10 +301,21 @@
     if(!colab||!cpf||!nasc||!projeto||!cidade||!cin||!cout) { showToast('⚠ Preencha todos os campos obrigatórios'); return; }
     if(cpf.replace(/\D/g,'').length < 11) { showToast('⚠ CPF inválido'); return; }
     if(cin>=cout) { showToast('⚠ Check-out deve ser após o check-in'); return; }
-    reservas.unshift({ id:nextId++, colab, cpf, nasc, projeto, cidade, cin, cout, obs, status:'pendente', hotel:'' });
+
+    const reserva = { id:nextId++, colab, cpf, nasc, projeto, cidade, cin, cout, obs, status:'pendente', hotel:'' };
+    reservas.unshift(reserva);
     salvarReservas();
     ['f-colab','f-cpf','f-nasc','f-projeto','f-cidade','f-cin','f-cout','f-obs'].forEach(id => { document.getElementById(id).value=''; });
-    showToast('✓ Solicitação enviada!');
+    showToast('⏳ Enviando solicitação...');
+
+    fetch(SCRIPT_URL, {
+      method: 'POST',
+      mode: 'no-cors',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(reserva)
+    })
+    .then(() => showToast('✓ Solicitação enviada com sucesso!'))
+    .catch(() => showToast('✓ Salvo localmente. Verifique a conexão.'));
   }
 
   function renderDash() {
