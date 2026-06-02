@@ -63,6 +63,13 @@
     .r-hotel-field { margin-top: 10px; }
     .r-hotel-field label { font-size: 11px; font-weight: 600; color: #666; text-transform: uppercase; letter-spacing: 0.4px; display: block; margin-bottom: 4px; }
     .r-hotel-field input { width: 100%; padding: 8px 10px; font-size: 13px; border: 1px solid #ddd; border-radius: 8px; background: #f8f8f8; font-family: inherit; }
+    .anexo-area { margin-top: 10px; }
+    .anexo-area label { font-size: 11px; font-weight: 600; color: #666; text-transform: uppercase; letter-spacing: 0.4px; display: block; margin-bottom: 4px; }
+    .anexo-btn { width: 100%; padding: 9px; border-radius: 8px; border: 1px dashed #1a73e8; color: #1a73e8; background: #f0f6ff; font-size: 13px; font-weight: 500; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; }
+    .anexo-preview { margin-top: 8px; background: #f8f8f8; border-radius: 8px; border: 1px solid #e0e0e0; padding: 10px 12px; display: flex; align-items: center; gap: 8px; }
+    .anexo-preview span { font-size: 13px; color: #333; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; }
+    .anexo-preview a { font-size: 12px; color: #1a73e8; font-weight: 500; white-space: nowrap; text-decoration: none; }
+    .anexo-preview .del-anexo { color: #991b1b; cursor: pointer; font-size: 18px; flex-shrink: 0; }
     .r-actions { display: flex; gap: 10px; margin-top: 12px; border-top: 1px solid #f0f0f0; padding-top: 12px; }
     .btn-sm { flex: 1; padding: 9px; border-radius: 8px; font-size: 13px; font-weight: 500; cursor: pointer; text-align: center; border: 1px solid #ddd; background: #fff; color: #333; display: flex; align-items: center; justify-content: center; gap: 5px; -webkit-tap-highlight-color: transparent; }
     .btn-sm.approve { background: #d1fae5; color: #065f46; border-color: #6ee7b7; }
@@ -222,7 +229,16 @@
     setTimeout(() => t.classList.remove('show'), 2500);
   }
 
+  const DASH_SENHA = 'compras2026';
+  let dashLiberado = false;
+
   function switchTab(name) {
+    if(name === 'dash' && !dashLiberado) {
+      const senha = prompt('🔒 Área restrita\nDigite a senha para acessar o Dashboard:');
+      if(senha === null) return;
+      if(senha !== DASH_SENHA) { showToast('⚠ Senha incorreta!'); return; }
+      dashLiberado = true;
+    }
     document.querySelectorAll('.tab').forEach((t,i) => t.classList.toggle('active', ['nova','lista','dash'][i]===name));
     document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
     document.getElementById('screen-'+name).classList.add('active');
@@ -260,6 +276,20 @@
           <div class="r-hotel-field">
             <label>HOTEL (definido pelo comprador)</label>
             <input type="text" placeholder="Nome do hotel / pousada" value="${r.hotel||''}" onchange="salvarHotel(${r.id}, this.value)" />
+          </div>
+          <div class="anexo-area">
+            <label><i class="ti ti-paperclip" style="font-size:12px;"></i> Comprovante da reserva</label>
+            ${r.anexo ? `
+              <div class="anexo-preview">
+                <i class="ti ti-file-text" style="color:#1a73e8;font-size:18px;flex-shrink:0;"></i>
+                <span>${r.anexoNome}</span>
+                <a href="${r.anexo}" download="${r.anexoNome}">Baixar</a>
+                <span class="del-anexo" onclick="removerAnexo(${r.id})">×</span>
+              </div>` : `
+              <label class="anexo-btn" for="anexo-${r.id}">
+                <i class="ti ti-upload"></i> Anexar comprovante (PDF ou imagem)
+              </label>
+              <input type="file" id="anexo-${r.id}" accept=".pdf,image/*" style="display:none" onchange="salvarAnexo(${r.id}, this)" />`}
           </div>` : ''}
         ${r.status==='pendente' ? `
           <div class="r-actions">
@@ -273,6 +303,27 @@
   function salvarHotel(id, val) {
     const r = reservas.find(x=>x.id===id);
     if(r) { r.hotel = val; salvarReservas(); showToast('Hotel salvo!'); }
+  }
+
+  function salvarAnexo(id, input) {
+    const r = reservas.find(x=>x.id===id);
+    if(!r || !input.files[0]) return;
+    const file = input.files[0];
+    if(file.size > 5 * 1024 * 1024) { showToast('⚠ Arquivo muito grande. Máximo 5MB.'); return; }
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      r.anexo = e.target.result;
+      r.anexoNome = file.name;
+      salvarReservas();
+      renderList();
+      showToast('✓ Comprovante anexado!');
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function removerAnexo(id) {
+    const r = reservas.find(x=>x.id===id);
+    if(r) { r.anexo = null; r.anexoNome = null; salvarReservas(); renderList(); showToast('Comprovante removido.'); }
   }
 
   function mudarStatus(id, novoStatus) {
