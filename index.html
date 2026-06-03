@@ -219,6 +219,7 @@
   const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbz1K5E6460O6TqAIIeZfAZfb0G6FTt6uQWp3E1_DAKKW8YpqiqOcTwTSPkq70Xn5rkZ/exec';
   const DASH_SENHA = 'compras2026';
   let dashLiberado = false;
+  let compradorLiberado = false;
   let reservas = [];
   let curFilter = 'todas';
 
@@ -267,6 +268,16 @@
     if(name==='dash') renderDash();
   }
 
+  function liberarComprador() {
+    if(compradorLiberado) return true;
+    const senha = prompt('Área do comprador\nDigite a senha para continuar:');
+    if(senha === null) return false;
+    if(senha !== DASH_SENHA) { showToast('Senha incorreta!'); return false; }
+    compradorLiberado = true;
+    renderList();
+    return true;
+  }
+
   function renderList() {
     const c = document.getElementById('lista-container');
     const filtered = curFilter==='todas' ? reservas : reservas.filter(r=>r.status===curFilter);
@@ -283,17 +294,21 @@
           </div>
           <span class="badge ${r.status}">${r.status.charAt(0).toUpperCase()+r.status.slice(1)}</span>
         </div>
+        ${compradorLiberado ? `
         <div class="r-detail">
           <i class="ti ti-id" style="font-size:13px;"></i> ${r.cpf}
           &nbsp;·&nbsp;
           <i class="ti ti-cake" style="font-size:13px;"></i> ${formatDate(r.nasc)}
-        </div>
+        </div>` : `
+        <div class="r-detail" style="color:#bbb;font-size:12px;">
+          <i class="ti ti-lock" style="font-size:13px;"></i> Dados pessoais ocultos
+        </div>`}
         <div class="r-dates">
           <i class="ti ti-calendar-event" style="font-size:14px;"></i>
           ${formatDate(r.cin)} <i class="ti ti-arrow-right" style="font-size:13px;"></i> ${formatDate(r.cout)}
         </div>
         ${r.obs ? `<div class="r-sub" style="margin-top:6px;"><i class="ti ti-note" style="font-size:13px;"></i> ${r.obs}</div>` : ''}
-        ${r.status==='aprovada' ? `
+        ${compradorLiberado && r.status==='aprovada' ? `
           <div class="r-hotel-field">
             <label>HOTEL (definido pelo comprador)</label>
             <input type="text" placeholder="Nome do hotel / pousada" value="${r.hotel||''}" onchange="salvarHotel('${r.firebaseKey}', this.value)" />
@@ -312,14 +327,21 @@
               </label>
               <input type="file" id="anexo-${r.firebaseKey}" accept=".pdf,image/*" style="display:none" onchange="salvarAnexo('${r.firebaseKey}', this)" />`}
           </div>` : ''}
-        ${r.status==='pendente' ? `
+        ${compradorLiberado && r.status==='pendente' ? `
           <div class="r-actions">
             <div class="btn-sm approve" onclick="mudarStatus('${r.firebaseKey}','aprovada')"><i class="ti ti-check"></i> Aprovar</div>
             <div class="btn-sm cancel" onclick="mudarStatus('${r.firebaseKey}','cancelada')"><i class="ti ti-x"></i> Cancelar</div>
           </div>` : ''}
+        ${!compradorLiberado && r.status==='pendente' ? `
+          <div style="margin-top:10px;">
+            <div class="btn-sm" onclick="liberarComprador()" style="width:100%;justify-content:center;color:#1a73e8;border-color:#1a73e8;">
+              <i class="ti ti-lock"></i> Acesso do comprador
+            </div>
+          </div>` : ''}
+        ${compradorLiberado ? `
         <div style="margin-top:10px;text-align:right;">
           <span onclick="excluirReserva('${r.firebaseKey}')" style="font-size:12px;color:#999;cursor:pointer;"><i class="ti ti-trash" style="font-size:13px;vertical-align:-1px;"></i> Excluir</span>
-        </div>
+        </div>` : ''}
       </div>
     `).join('');
   }
