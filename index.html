@@ -180,6 +180,11 @@
     <div class="chip" onclick="filterList(this,'aprovada')">Aprovadas</div>
     <div class="chip" onclick="filterList(this,'cancelada')">Canceladas</div>
   </div>
+  <div style="position:relative;margin-bottom:14px;">
+    <i class="ti ti-search" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:#999;font-size:16px;"></i>
+    <input type="text" id="busca-nome" placeholder="Buscar por nome do colaborador..." oninput="renderList()"
+      style="width:100%;padding:10px 12px 10px 34px;font-size:14px;border:1px solid #ddd;border-radius:8px;background:#fff;font-family:inherit;outline:none;" />
+  </div>
   <div id="lista-container"><div class="loading"><i class="ti ti-refresh"></i>Carregando...</div></div>
 </div>
 
@@ -280,7 +285,9 @@
 
   function renderList() {
     const c = document.getElementById('lista-container');
-    const filtered = curFilter==='todas' ? reservas : reservas.filter(r=>r.status===curFilter);
+    const busca = (document.getElementById('busca-nome')?.value || '').toLowerCase().trim();
+    let filtered = curFilter==='todas' ? reservas : reservas.filter(r=>r.status===curFilter);
+    if(busca) filtered = filtered.filter(r => r.colab && r.colab.toLowerCase().includes(busca));
     if(!filtered.length) {
       c.innerHTML = '<div class="empty"><i class="ti ti-calendar-off"></i>Nenhuma reserva encontrada</div>';
       return;
