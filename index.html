@@ -221,7 +221,7 @@
   const db = firebase.database();
   const reservasRef = db.ref('reservas');
 
-  const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbz1K5E6460O6TqAIIeZfAZfb0G6FTt6uQWp3E1_DAKKW8YpqiqOcTwTSPkq70Xn5rkZ/exec';
+  const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbz_n-xQ1VrGNj98OAaY5Hulgkk7sTN-GJT1ROtG5egcOy7x0ro_ZY02gc1tphCn_STG/exec';
   const DASH_SENHA = 'compras2026';
   let dashLiberado = false;
   let compradorLiberado = false;
@@ -315,10 +315,11 @@
           ${formatDate(r.cin)} <i class="ti ti-arrow-right" style="font-size:13px;"></i> ${formatDate(r.cout)}
         </div>
         ${r.obs ? `<div class="r-sub" style="margin-top:6px;"><i class="ti ti-note" style="font-size:13px;"></i> ${r.obs}</div>` : ''}
-        ${compradorLiberado && r.status==='aprovada' ? `
+        ${r.status==='aprovada' ? `
           <div class="r-hotel-field">
-            <label>HOTEL (definido pelo comprador)</label>
-            <input type="text" placeholder="Nome do hotel / pousada" value="${r.hotel||''}" onchange="salvarHotel('${r.firebaseKey}', this.value)" />
+            <label>HOTEL</label>
+            <div style="padding:8px 10px;font-size:13px;background:#f8f8f8;border:1px solid #ddd;border-radius:8px;color:${r.hotel ? '#222' : '#999'};">${r.hotel || 'Aguardando definição do comprador'}</div>
+            ${compradorLiberado ? `<input type="text" placeholder="Editar hotel..." value="${r.hotel||''}" onchange="salvarHotel('${r.firebaseKey}', this.value)" style="margin-top:6px;width:100%;padding:8px 10px;font-size:13px;border:1px solid #ddd;border-radius:8px;background:#fff;font-family:inherit;" />` : ''}
           </div>
           <div class="anexo-area">
             <label><i class="ti ti-paperclip" style="font-size:12px;"></i> Voucher da reserva</label>
@@ -327,12 +328,15 @@
                 <i class="ti ti-file-text" style="color:#1a73e8;font-size:18px;flex-shrink:0;"></i>
                 <span>${r.anexoNome}</span>
                 <a href="${r.anexo}" download="${r.anexoNome}">Baixar</a>
-                <span class="del-anexo" onclick="removerAnexo('${r.firebaseKey}')">×</span>
+                ${compradorLiberado ? `<span class="del-anexo" onclick="removerAnexo('${r.firebaseKey}')">×</span>` : ''}
               </div>` : `
+              ${compradorLiberado ? `
               <label class="anexo-btn" for="anexo-${r.firebaseKey}">
                 <i class="ti ti-upload"></i> Anexar voucher (PDF ou imagem)
               </label>
-              <input type="file" id="anexo-${r.firebaseKey}" accept=".pdf,image/*" style="display:none" onchange="salvarAnexo('${r.firebaseKey}', this)" />`}
+              <input type="file" id="anexo-${r.firebaseKey}" accept=".pdf,image/*" style="display:none" onchange="salvarAnexo('${r.firebaseKey}', this)" />` : `
+              <div style="padding:9px;border-radius:8px;border:1px dashed #ddd;color:#999;font-size:13px;text-align:center;">Aguardando voucher do comprador</div>`}
+            `}
           </div>` : ''}
         ${compradorLiberado && r.status==='pendente' ? `
           <div class="r-actions">
@@ -340,9 +344,12 @@
             <div class="btn-sm cancel" onclick="mudarStatus('${r.firebaseKey}','cancelada')"><i class="ti ti-x"></i> Cancelar</div>
           </div>` : ''}
         ${!compradorLiberado && r.status==='pendente' ? `
-          <div style="margin-top:10px;">
-            <div class="btn-sm" onclick="liberarComprador()" style="width:100%;justify-content:center;color:#1a73e8;border-color:#1a73e8;">
+          <div style="margin-top:10px;display:flex;gap:8px;">
+            <div class="btn-sm" onclick="liberarComprador()" style="flex:1;justify-content:center;color:#1a73e8;border-color:#1a73e8;">
               <i class="ti ti-lock"></i> Acesso do comprador
+            </div>
+            <div class="btn-sm cancel" onclick="cancelarSolicitante('${r.firebaseKey}', ${JSON.stringify(r).replace(/'/g,'&#39;')})" style="flex:1;">
+              <i class="ti ti-x"></i> Cancelar
             </div>
           </div>` : ''}
         ${compradorLiberado ? `
@@ -373,6 +380,16 @@
   function removerAnexo(key) {
     reservasRef.child(key).update({ anexo: null, anexoNome: null });
     showToast('Voucher removido.');
+  }
+
+  function cancelarSolicitante(key, r) {
+    if(!confirm('Tem certeza que deseja cancelar esta reserva?')) return;
+    reservasRef.child(key).update({ status: 'cancelada' });
+    showToast('Reserva cancelada!');
+    fetch(SCRIPT_URL, {
+      method: 'POST', mode: 'no-cors',
+      body: JSON.stringify({ tipo: 'cancelamento', colab: r.colab, projeto: r.projeto, cidade: r.cidade, cin: r.cin, cout: r.cout })
+    }).catch(()=>{});
   }
 
   function mudarStatus(key, novoStatus) {
